@@ -1,0 +1,5 @@
+{
+  "name": "progress-board",
+  "owner": { "name": "HaGotHem" },
+  "plugins": [{ "name": "progress-board", "source": "./" }]
+}
