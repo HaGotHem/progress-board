@@ -1,6 +1,6 @@
 {
   "name": "progress-board",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Panneau de progression : barre générale, une barre par tâche et par sous-agent (Opus, Sonnet, Haiku, Gemini Flash/Hydrogen/Argon).",
   "types": "./types/index.d.ts"
 }

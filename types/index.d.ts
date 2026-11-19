@@ -35,6 +35,8 @@ export type Board = {
   runs: Run[]
   /** Whether the main session (the lead) is in a turn right now. */
   leadBusy?: boolean
+  /** The main session's model id, read at each turn start; absent until the first turn. */
+  leadModel?: string
   /** The highest seat (desk) ever handed out in the office. Absent on a board an earlier version stored. */
   maxSeat?: number
   /** What each seat last held, so its desk is still drawn when its run left the history. Same absence. */

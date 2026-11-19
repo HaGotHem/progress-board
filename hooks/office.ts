@@ -22,6 +22,8 @@ export type Desk = {
   name: string
   /** What it was asked to do, a few words. */
   label: string
+  /** The exact model id it runs on (claude-sonnet-5-5, gemini-4-neon-low), shown on its desk's plate. */
+  model?: string
   /** When it arrived, on the same clock as `now`. */
   arrivedAt: number
   /** When it finished, on the same clock as `now`. Absent while it works. */
@@ -32,7 +34,7 @@ export type Desk = {
 
 export type Scene = {
   desks: Desk[]
-  lead: { mood: Mood; color: string }
+  lead: { mood: Mood; color: string; model?: string }
   now: number
   /** A stable origin of time, on the same clock as `now`: looping animations are phased from it. */
   epoch: number
@@ -111,7 +113,7 @@ const departs = (d: Desk) => d.endedAt != null && d.mood !== 'busy'
  * the lead going busy: those change it.
  */
 export function officeKey(desks: Desk[], leadMood: Mood, _now: number, _freshMs: number): string {
-  const rows = desks.map(d => [d.id, d.kind, d.role, d.color, d.name, d.label, d.arrivedAt, calm(d.mood), d.seat ?? null, departs(d) ? 1 : 0])
+  const rows = desks.map(d => [d.id, d.kind, d.role, d.color, d.name, d.label, d.model ?? '', d.arrivedAt, calm(d.mood), d.seat ?? null, departs(d) ? 1 : 0])
   return JSON.stringify([rows, calm(leadMood)])
 }
 
@@ -490,6 +492,11 @@ function render(scene: Scene, lay: Layout): { svg: string; settleAt: number } {
 
     const furniture = desk(x, y, mood, d.color, loopAt) + deskObjects(d.role, d.id, x, y)
     const tags =
+      // The plate on the desk's front: the exact model, in the model's color.
+      (d.model
+        ? `<rect class="model-plate" x="${x + 24}" y="${y + 61}" width="102" height="12" fill="#2a2420" stroke="${d.color}"/>` +
+          `<text x="${x + 75}" y="${y + 70}" fill="${d.color}" style="font-size:8px">${xml(cut(d.model, 22))}</text>`
+        : '') +
       `<text x="${x + 75}" y="${y + 96}" fill="${d.color}" font-weight="700" style="font-size:11px">${xml(cut(d.name, 22))}</text>` +
       `<text x="${x + 75}" y="${y + 110}" fill="#a89a8a" style="font-size:10px">${xml(cut(d.label, 26))}</text>`
 
@@ -593,8 +600,15 @@ function render(scene: Scene, lay: Layout): { svg: string; settleAt: number } {
   // The lead's desk, its trophy and nameplate, over the lead's legs while it sits.
   parts.push(desk(HOME.x, HOME.y, leadMood, lead.color, loopAt, true))
   parts.push(place('lead-deco', TROPHY, HOME.x, HOME.y))
-  parts.push(`<rect x="${HOME.x + 50}" y="${HOME.y + 62}" width="92" height="12" fill="#2a2420"/>`)
-  parts.push(`<text x="${HOME.x + 96}" y="${HOME.y + 72}" fill="#f2c14e" style="font-size:9px">CHEF DE PROJET</text>`)
+  // Its nameplate, with the session's model under the title once it is known.
+  if (lead.model) {
+    parts.push(`<rect class="model-plate" x="${HOME.x + 40}" y="${HOME.y + 57}" width="112" height="20" fill="#2a2420"/>`)
+    parts.push(`<text x="${HOME.x + 96}" y="${HOME.y + 66}" fill="#f2c14e" style="font-size:9px">CHEF DE PROJET</text>`)
+    parts.push(`<text x="${HOME.x + 96}" y="${HOME.y + 75}" fill="${lead.color}" style="font-size:8px">${xml(cut(lead.model, 24))}</text>`)
+  } else {
+    parts.push(`<rect x="${HOME.x + 50}" y="${HOME.y + 62}" width="92" height="12" fill="#2a2420"/>`)
+    parts.push(`<text x="${HOME.x + 96}" y="${HOME.y + 72}" fill="#f2c14e" style="font-size:9px">CHEF DE PROJET</text>`)
+  }
 
   const defsMarkup =
     [...defs].map(([markup, id]) => `<g id="${id}">${markup}</g>`).join('') +

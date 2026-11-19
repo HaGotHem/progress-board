@@ -53,13 +53,19 @@ function family(model: string): { name: string; color: string } {
   const m = model.toLowerCase()
   const effort = /-(low|medium|high|xhigh)$/.exec(m)?.[1]
   const tag = effort ? ` (${effort})` : ''
+  // A Claude id carries its version (claude-opus-5-5 → Opus 5.5); an alias (opus) does not.
+  const version = /(?:opus|sonnet|haiku|fable)-(\d+)-(\d+)/.exec(m)
+  const v = version ? ` ${version[1]}.${version[2]}` : ''
+  // agy's orchestrators before the families they are named after.
+  if (m.includes('orchestrator')) return { name: m.includes('neon') ? 'Orchestrateur Neon' : 'Orchestrateur Argon', color: '#f2c14e' }
+  if (m.includes('neon')) return { name: `Gemini Neon${tag}`, color: '#e85dd8' }
   if (m.includes('hydrogen')) return { name: `Gemini Hydrogen${tag}`, color: '#4f8df7' }
   if (m.includes('argon')) return { name: `Gemini Argon${tag}`, color: '#9b72f2' }
   if (m.includes('gemini') || m.includes('flash')) return { name: `Gemini Flash${tag}`, color: '#2bb3c0' }
-  if (m.includes('opus')) return { name: 'Opus', color: '#d97757' }
-  if (m.includes('sonnet')) return { name: 'Sonnet', color: '#e0a84e' }
-  if (m.includes('haiku')) return { name: 'Haiku', color: '#7fb069' }
-  if (m.includes('fable')) return { name: 'Fable', color: '#c76b98' }
+  if (m.includes('opus')) return { name: `Opus${v}`, color: '#d97757' }
+  if (m.includes('sonnet')) return { name: `Sonnet${v}`, color: '#e0a84e' }
+  if (m.includes('haiku')) return { name: `Haiku${v}`, color: '#7fb069' }
+  if (m.includes('fable')) return { name: `Fable${v}`, color: '#c76b98' }
   return { name: model, color: 'suggestion' }
 }
 
@@ -231,7 +237,14 @@ export const register: Register = on => {
 
   // The main session is the lead: busy while a turn runs.
   on('turn.start', async ($, e, next) => {
-    await update($, board, b => ({ ...b, leadBusy: true }))
+    // The lead's model, for its nameplate in the office: it can change between turns (/model).
+    let leadModel: string | undefined
+    try {
+      leadModel = await $.session.model()
+    } catch {
+      leadModel = undefined
+    }
+    await update($, board, b => ({ ...b, leadBusy: true, leadModel: leadModel ?? b.leadModel }))
     ensureTicker($)
     return next(e)
   })
@@ -526,7 +539,8 @@ export const register: Register = on => {
 
     const lead = card({
       kind: 'claude',
-      name: 'Claude',
+      // Its model once a turn has read it (Claude · Fable 5.2), else just Claude.
+      name: b.leadModel ? `Claude · ${family(b.leadModel).name}` : 'Claude',
       role: 'orchestrateur',
       mood: b.leadBusy ? 'busy' : 'rest',
       color: '#d97757',
@@ -646,16 +660,18 @@ export const register: Register = on => {
         color: f.color.startsWith('#') ? f.color : '#d97757',
         name: f.name,
         label: r.label,
+        model: r.model,
         arrivedAt: r.startedAt,
         seat: r.seat,
         // Only a finished run has an end: a live one never leaves.
         endedAt: live ? undefined : r.endedAt,
       }
     })
-    const lead = { mood: (b.leadBusy ? 'busy' : 'rest') as Mood, color: '#d97757' }
+    const lead = { mood: (b.leadBusy ? 'busy' : 'rest') as Mood, color: '#d97757', model: b.leadModel }
     // The key leaves time out: the scene is rebuilt when a desk, a mood that matters or a seat
     // changes. Arrivals, the lead's round and departures are planned in the scene and play alone.
-    const key = officeKey(desks, lead.mood, now, FRESH_MS)
+    // The lead's model is on its nameplate: a /model switch redraws the room.
+    const key = `${officeKey(desks, lead.mood, now, FRESH_MS)}|${lead.model ?? ''}`
     // It is also rebuilt once when everything planned in it is over: a scene reloaded later (the
     // pane reopened) would otherwise replay arrivals and departures that already happened.
     if (!officeCache || officeCache.key !== key || (now >= officeCache.settleAt && officeCache.builtAt < officeCache.settleAt)) {
